@@ -1,0 +1,519 @@
+//binomial heap
+#include <stdio.h>
+#include <stdlib.h>
+
+// Structure for a Binomial Tree node
+struct BinomialNode {
+    int key;
+    int degree;
+    struct BinomialNode *parent, *child, *sibling;
+};
+
+// Function to create a new Binomial Tree node
+struct BinomialNode* createNode(int key) {
+    struct BinomialNode* newNode = (struct BinomialNode*)malloc(sizeof(struct BinomialNode));
+    newNode->key = key;
+    newNode->degree = 0;
+    newNode->parent = NULL;
+    newNode->child = NULL;
+    newNode->sibling = NULL;
+    return newNode;
+}
+
+// Function to merge two Binomial Trees
+struct BinomialNode* mergeTrees(struct BinomialNode* b1, struct BinomialNode* b2) {
+    if (b1->key > b2->key) {
+        struct BinomialNode* temp = b1;
+        b1 = b2;
+        b2 = temp;
+    }
+
+    b2->parent = b1;
+    b2->sibling = b1->child;
+    b1->child = b2;
+    b1->degree++;
+    return b1;
+}
+
+// Function to merge two Binomial Heaps
+struct BinomialNode* mergeHeaps(struct BinomialNode* h1, struct BinomialNode* h2) {
+    if (h1 == NULL)
+        return h2;
+    if (h2 == NULL)
+        return h1;
+
+    struct BinomialNode* res = NULL;
+    struct BinomialNode* prev = NULL;
+    struct BinomialNode* current1 = h1;
+    struct BinomialNode* current2 = h2;
+
+    while (current1 != NULL && current2 != NULL) {
+        if (current1->degree <= current2->degree) {
+            if (prev != NULL)
+                prev->sibling = current1;
+            else
+                res = current1;
+
+            prev = current1;
+            current1 = current1->sibling;
+        } else {
+            if (prev != NULL)
+                prev->sibling = current2;
+            else
+                res = current2;
+
+            prev = current2;
+            current2 = current2->sibling;
+        }
+    }
+
+    if (current1 != NULL)
+        prev->sibling = current1;
+    else
+        prev->sibling = current2;
+
+    return res;
+}
+
+// Function to union two Binomial Heaps
+struct BinomialNode* unionHeaps(struct BinomialNode* h1, struct BinomialNode* h2) {
+    if (h1 == NULL && h2 == NULL)
+        return NULL;
+    else if (h1 == NULL)
+        return h2;
+    else if (h2 == NULL)
+        return h1;
+
+    struct BinomialNode* prev = NULL;
+    struct BinomialNode* current1 = h1;
+    struct BinomialNode* current2 = h2;
+    struct BinomialNode* res = NULL;
+
+    while (current1 != NULL && current2 != NULL) {
+        if (current1->degree <= current2->degree) {
+            if (prev != NULL)
+                prev->sibling = current1;
+            else
+                res = current1;
+
+            prev = current1;
+            current1 = current1->sibling;
+        } else {
+            if (prev != NULL)
+                prev->sibling = current2;
+            else
+                res = current2;
+
+            prev = current2;
+            current2 = current2->sibling;
+        }
+    }
+
+    if (current1 != NULL)
+        prev->sibling = current1;
+    else
+        prev->sibling = current2;
+
+    struct BinomialNode* current = res;
+    struct BinomialNode* next = res->sibling;
+    struct BinomialNode* prevTree = NULL;
+
+    while (next != NULL) {
+        if (current->degree != next->degree || (next->sibling != NULL && next->sibling->degree == current->degree)) {
+            prevTree = current;
+            current = next;
+        } else {
+            if (current->key <= next->key) {
+                current->sibling = next->sibling;
+                mergeTrees(current, next);
+            } else {
+                if (prevTree == NULL)
+                    res = next;
+                else
+                    prevTree->sibling = next;
+
+                mergeTrees(next, current);
+                current = next;
+            }
+        }
+        next = current->sibling;
+    }
+
+    return res;
+}
+
+// Function to insert a key into the Binomial Heap
+struct BinomialNode* insert(struct BinomialNode* head, int key) {
+    struct BinomialNode* temp = createNode(key);
+    return unionHeaps(head, temp);
+}
+
+// Function to extract the node with the minimum key from the Binomial Heap
+struct BinomialNode* extractMinNode(struct BinomialNode* head) {
+    if (head == NULL)
+        return NULL;
+
+    struct BinomialNode* prev = NULL;
+    struct BinomialNode* current = head;
+    struct BinomialNode* minNode = head;
+    struct BinomialNode* minPrev = NULL;
+
+    while (current->sibling != NULL) {
+        if (current->sibling->key < minNode->key) {
+            minNode = current->sibling;
+            minPrev = current;
+        }
+        prev = current;
+        current = current->sibling;
+    }
+
+    if (minPrev == NULL)
+        head = minNode;
+    else
+        minPrev->sibling = minNode->sibling;
+
+    struct BinomialNode* child = minNode->child;
+    struct BinomialNode* temp = child;
+
+    while (temp != NULL) {
+        temp->parent = NULL;
+        temp = temp->sibling;
+    }
+
+    head = unionHeaps(head, child);
+    free(minNode);
+    return head;
+}
+
+// Function to search for a key in the Binomial Heap
+struct BinomialNode* searchKey(struct BinomialNode* head, int key) {
+    if (head == NULL)
+        return NULL;
+
+    struct BinomialNode* current = head;
+
+    while (current != NULL) {
+        if (current->key == key)
+            return current;
+        
+        struct BinomialNode* childResult = searchKey(current->child, key);
+        if (childResult != NULL)
+            return childResult;
+
+        current = current->sibling;
+    }
+
+    return NULL;
+}
+
+// Function to decrease the key of a node in the Binomial Heap
+void decreaseKey(struct BinomialNode* head, int oldKey, int newKey) {
+    struct BinomialNode* node = searchKey(head, oldKey);
+
+    if (node == NULL) {
+        printf("Key not found in the heap.\n");
+        return;
+    }
+
+    if (newKey > node->key) {
+        printf("New key is greater than the current key.\n");
+        return;
+    }
+
+    node->key = newKey;
+    struct BinomialNode* current = node;
+    struct BinomialNode* parent = current->parent;
+
+    while (parent != NULL && current->key < parent->key) {
+        int temp = current->key;
+        current->key = parent->key;
+        parent->key = temp;
+        current = parent;
+        parent = current->parent;
+    }
+
+    printf("Key decreased successfully.\n");
+}
+
+// Function to delete a node with the given key from the Binomial Heap
+struct BinomialNode* deleteNode(struct BinomialNode* head, int key) {
+    if (head == NULL)
+        return NULL;
+
+    decreaseKey(head, key, INT_MIN);
+    head = extractMinNode(head);
+    printf("Node deleted successfully.\n");
+    return head;
+}
+
+// Function to display the Binomial Heap
+void displayHeap(struct BinomialNode* head) {
+    if (head == NULL)
+        return;
+
+    struct BinomialNode* current = head;
+
+    while (current != NULL) {
+        printf("%d ", current->key);
+        displayHeap(current->child);
+        current = current->sibling;
+    }
+}
+
+int main() {
+    struct BinomialNode* head = NULL;
+
+    head = insert(head, 10);
+    head = insert(head, 20);
+    head = insert(head, 30);
+    head = insert(head, 40);
+    head = insert(head, 50);
+
+    printf("Initial Binomial Heap: ");
+    displayHeap(head);
+    printf("\n");
+
+    head = deleteNode(head, 20);
+    printf("Binomial Heap after deleting 20: ");
+    displayHeap(head);
+    printf("\n");
+
+    return 0;
+}
+
+
+//Fibonacci heap
+#include <stdio.h>
+#include <stdlib.h>
+
+struct FibonacciNode {
+    int key;
+    int degree;
+    int marked;
+    struct FibonacciNode* parent;
+    struct FibonacciNode* child;
+    struct FibonacciNode* left;
+    struct FibonacciNode* right;
+};
+
+struct FibonacciHeap {
+    struct FibonacciNode* min;
+    int numNodes;
+};
+
+struct FibonacciNode* createNode(int key) {
+    struct FibonacciNode* newNode = (struct FibonacciNode*)malloc(sizeof(struct FibonacciNode));
+    newNode->key = key;
+    newNode->degree = 0;
+    newNode->marked = 0;
+    newNode->parent = NULL;
+    newNode->child = NULL;
+    newNode->left = newNode;
+    newNode->right = newNode;
+    return newNode;
+}
+
+struct FibonacciHeap* createHeap() {
+    struct FibonacciHeap* newHeap = (struct FibonacciHeap*)malloc(sizeof(struct FibonacciHeap));
+    newHeap->min = NULL;
+    newHeap->numNodes = 0;
+    return newHeap;
+}
+
+void insert(struct FibonacciHeap* heap, int key) {
+    struct FibonacciNode* newNode = createNode(key);
+
+    if (heap->min == NULL) {
+        heap->min = newNode;
+    } else {
+        struct FibonacciNode* min = heap->min;
+        struct FibonacciNode* minRight = min->right;
+        newNode->left = min;
+        newNode->right = minRight;
+        min->right = newNode;
+        minRight->left = newNode;
+
+        if (newNode->key < heap->min->key) {
+            heap->min = newNode;
+        }
+    }
+
+    heap->numNodes++;
+}
+
+void consolidate(struct FibonacciHeap* heap) {
+    int maxDegree = heap->numNodes;
+    struct FibonacciNode** degreeTable = (struct FibonacciNode**)calloc(maxDegree, sizeof(struct FibonacciNode*));
+
+    struct FibonacciNode* current = heap->min;
+    int numRoots = 0;
+
+    if (current != NULL) {
+        numRoots++;
+        current = current->right;
+
+        while (current != heap->min) {
+            numRoots++;
+            current = current->right;
+        }
+    }
+
+    while (numRoots > 0) {
+        int degree = current->degree;
+        struct FibonacciNode* next = current->right;
+
+        while (degreeTable[degree] != NULL) {
+            struct FibonacciNode* sameDegreeNode = degreeTable[degree];
+
+            if (current->key > sameDegreeNode->key) {
+                struct FibonacciNode* temp = current;
+                current = sameDegreeNode;
+                sameDegreeNode = temp;
+            }
+
+            if (sameDegreeNode == heap->min) {
+                heap->min = current;
+            }
+
+            link(heap, sameDegreeNode, current);
+            degreeTable[degree] = NULL;
+            degree++;
+        }
+
+        degreeTable[degree] = current;
+        current = next;
+        numRoots--;
+    }
+
+    heap->min = NULL;
+
+    for (int i = 0; i < maxDegree; i++) {
+        if (degreeTable[i] != NULL) {
+            if (heap->min == NULL) {
+                heap->min = degreeTable[i];
+            } else {
+                struct FibonacciNode* min = heap->min;
+                struct FibonacciNode* minRight = min->right;
+                degreeTable[i]->left = min;
+                degreeTable[i]->right = minRight;
+                min->right = degreeTable[i];
+                minRight->left = degreeTable[i];
+
+                if (degreeTable[i]->key < heap->min->key) {
+                    heap->min = degreeTable[i];
+                }
+            }
+        }
+    }
+
+    free(degreeTable);
+}
+
+void link(struct FibonacciHeap* heap, struct FibonacciNode* child, struct FibonacciNode* parent) {
+    child->left->right = child->right;
+    child->right->left = child->left;
+
+    child->parent = parent;
+
+    if (parent->child == NULL) {
+        parent->child = child;
+        child->left = child;
+        child->right = child;
+    } else {
+        struct FibonacciNode* parentChild = parent->child;
+        struct FibonacciNode* parentChildRight = parentChild->right;
+        child->left = parentChild;
+        child->right = parentChildRight;
+        parentChild->right = child;
+        parentChildRight->left = child;
+    }
+
+    parent->degree++;
+    child->marked = 0;
+}
+
+void extractMin(struct FibonacciHeap* heap) {
+    struct FibonacciNode* minNode = heap->min;
+
+    if (minNode != NULL) {
+        struct FibonacciNode* child = minNode->child;
+
+        while (child != NULL) {
+            struct FibonacciNode* nextChild = child->right;
+
+            child->left = child;
+            child->right = child;
+            child->parent = NULL;
+
+            struct FibonacciNode* minRight = heap->min->right;
+            child->left = heap->min;
+            child->right = minRight;
+            heap->min->right = child;
+            minRight->left = child;
+
+            child = nextChild;
+        }
+
+        minNode->left->right = minNode->right;
+        minNode->right->left = minNode->left;
+
+        if (minNode == minNode->right) {
+            heap->min = NULL;
+        } else {
+            heap->min = minNode->right;
+            consolidate(heap);
+        }
+
+        heap->numNodes--;
+        free(minNode);
+    }
+}
+
+int getMin(struct FibonacciHeap* heap) {
+    return heap->min->key;
+}
+
+int isEmpty(struct FibonacciHeap* heap) {
+    return heap->numNodes == 0;
+}
+
+void printHeap(struct FibonacciNode* node) {
+    if (node == NULL)
+        return;
+
+    struct FibonacciNode* current = node;
+    printf("%d ", current->key);
+
+    struct FibonacciNode* child = current->child;
+    if (child != NULL) {
+        printHeap(child);
+        child = child->right;
+        while (child != current->child) {
+            printHeap(child);
+            child = child->right;
+        }
+    }
+}
+
+int main() {
+    struct FibonacciHeap* heap = createHeap();
+
+    insert(heap, 10);
+    insert(heap, 5);
+    insert(heap, 7);
+    insert(heap, 8);
+
+    printf("Heap: ");
+    printHeap(heap->min);
+    printf("\n");
+
+    printf("Minimum key: %d\n", getMin(heap));
+
+    extractMin(heap);
+
+    printf("Heap after extracting minimum: ");
+    printHeap(heap->min);
+    printf("\n");
+
+    return 0;
+}
